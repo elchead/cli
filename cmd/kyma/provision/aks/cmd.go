@@ -1,30 +1,23 @@
 package aks
 
 import (
-	"errors"
 	"fmt"
-	"io/ioutil"
-	"log"
 	"strings"
 
-	"github.com/avast/retry-go"
-	"github.com/kyma-project/cli/internal/kube"
-
-	hf "github.com/kyma-incubator/hydroform/provision"
 	"github.com/kyma-incubator/hydroform/provision/types"
+	prov "github.com/kyma-project/cli/cmd/kyma/provision"
 	"github.com/kyma-project/cli/internal/cli"
-	"github.com/kyma-project/cli/internal/files"
 	"github.com/spf13/cobra"
 )
 
-type command struct {
-	opts *Options
-	cli.Command
-}
+// type command struct {
+// 	opts *Options
+// 	cli.Command
+// }
 
 //NewCmd creates a new minikube command
 func NewCmd(o *Options) *cobra.Command {
-	c := command{
+	c := AksCmd{
 		Command: cli.Command{Options: o.Options},
 		opts:    o,
 	}
@@ -53,56 +46,8 @@ func NewCmd(o *Options) *cobra.Command {
 	return cmd
 }
 
-func (c *command) Run() error {
-	if err := c.validateFlags(); err != nil {
-		return err
-	}
-
-	cluster := newCluster(c.opts)
-	provider, err := newProvider(c.opts)
-	if err != nil {
-		return err
-	}
-
-	if !c.opts.Verbose {
-		// discard all the noise from terraform logs if not verbose
-		log.SetOutput(ioutil.Discard)
-	}
-	s := c.NewStep("Provisioning AKS cluster")
-	home, err := files.KymaHome()
-	if err != nil {
-		s.Failure()
-		return err
-	}
-
-	err = retry.Do(
-		func() error {
-			cluster, err = hf.Provision(cluster, provider, types.WithDataDir(home), types.Persistent(), types.Verbose(c.opts.Verbose))
-			return err
-		},
-		retry.Attempts(c.opts.Attempts), retry.LastErrorOnly(!c.opts.Verbose))
-
-	if err != nil {
-		s.Failure()
-		return err
-	}
-	s.Success()
-
-	s = c.NewStep("Importing kubeconfig")
-	kubeconfig, err := hf.Credentials(cluster, provider, types.WithDataDir(home), types.Persistent())
-	if err != nil {
-		s.Failure()
-		return err
-	}
-
-	if err := kube.AppendConfig(kubeconfig, c.opts.KubeconfigPath); err != nil {
-		s.Failure()
-		return err
-	}
-	s.Success()
-
-	fmt.Printf("\nAKS cluster installed\nKubectl correctly configured: pointing to %s\n\nHappy AKS-ing! :)\n", cluster.Name)
-	return nil
+func (c *AksCmd) Run() error {
+	return prov.RunTemplate(c)
 }
 
 func newCluster(o *Options) *types.Cluster {
@@ -133,23 +78,4 @@ func newProvider(o *Options) (*types.Provider, error) {
 		p.CustomConfigurations[v[0]] = v[1]
 	}
 	return p, nil
-}
-
-func (c *command) validateFlags() error {
-	var errMessage strings.Builder
-	// mandatory flags
-	if c.opts.Name == "" {
-		errMessage.WriteString("\nRequired flag `name` has not been set.")
-	}
-	if c.opts.Project == "" {
-		errMessage.WriteString("\nRequired flag `project` has not been set.")
-	}
-	if c.opts.CredentialsFile == "" {
-		errMessage.WriteString("\nRequired flag `credentials` has not been set.")
-	}
-
-	if errMessage.Len() != 0 {
-		return errors.New(errMessage.String())
-	}
-	return nil
 }
