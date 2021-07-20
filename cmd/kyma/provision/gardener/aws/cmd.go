@@ -18,7 +18,7 @@ Use service account details to create a Secret and store it in Gardener.`,
 		RunE: func(_ *cobra.Command, _ []string) error { return c.Run() },
 	}
 
-	cmd.Flags().StringVarP(&o.Name, "name", "n", "", "Name of the cluster to provision. (required)")
+	cmd.Flags().StringVarP(&o.Name, "nameE", "n", "", "Name of the cluster to provision. (required)")
 	cmd.Flags().StringVarP(&o.Project, "project", "p", "", "Name of the Gardener project where you provision the cluster. (required)")
 	cmd.Flags().StringVarP(&o.CredentialsFile, "credentials", "c", "", "Path to the kubeconfig file of the Gardener service account for AWS. (required)")
 	cmd.Flags().StringVarP(&o.Secret, "secret", "s", "", "Name of the Gardener secret used to access AWS. (required)")
